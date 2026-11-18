@@ -1,6 +1,6 @@
 // Cache simples: app abre mesmo sem internet; dados vêm sempre da rede.
-const V = 'horta-v1';
-const SHELL = ['./', 'index.html', 'app.js', 'db.js', 'config.js', 'supabase.js', 'icon.svg', 'manifest.webmanifest'];
+const V = 'horta-v2';
+const SHELL = ['./', 'index.html', 'app.js', 'db.js', 'config.js', 'supabase.js', 'banner.jpg', 'favicon.png', 'manifest.webmanifest'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(V).then(c => c.addAll(SHELL))); self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== V).map(k => caches.delete(k))))); self.clients.claim(); });
 self.addEventListener('fetch', e => {

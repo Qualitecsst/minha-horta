@@ -165,6 +165,7 @@ function viewHoje() {
   for (const p of active()) { const sp = spById(p.species_id); if (sp) counts[sp.id] = (counts[sp.id] || 0) + 1; }
   const total = S.settings.layout.reduce((a, b) => a + b, 0);
   return `
+  <img class="banner" src="banner.jpg" alt="Horta do Joaquim, cultivo hidropônico">
   <div class="grid2">
     <div class="card" style="margin:0">
       <div class="muted small">pH da água</div>

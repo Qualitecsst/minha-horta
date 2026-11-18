@@ -3,43 +3,53 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Minha Horta</title>
-<meta name="description" content="Acompanhamento da horta hidropônica: plantas, fotos, pH e lembretes.">
-<meta name="theme-color" content="#2f7d4f">
+<title>Horta do Joaquim</title>
+<meta name="description" content="Horta do Joaquim: acompanhamento do cultivo hidropônico, com plantas, fotos, pH e lembretes.">
+<meta name="theme-color" content="#1b6b27">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&display=swap" rel="stylesheet">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Minha Horta">
+<meta name="apple-mobile-web-app-title" content="Horta do Joaquim">
 <style>
 :root {
-  --bg: #f4f6f1; --surface: #ffffff; --surface-2: #eef2ea; --text: #1d2a21; --muted: #5f6f63;
-  --line: #d9e0d4; --accent: #2f7d4f; --accent-ink: #ffffff; --accent-soft: #dcefe2;
+  --bg: #f7f4ec; --surface: #ffffff; --surface-2: #f1eee4; --text: #1f2a1c; --muted: #61705c;
+  --line: #e2ddcf; --accent: #1b6b27; --accent-ink: #ffffff; --accent-soft: #dcefd9;
+  --brand-orange: #ef6c0f; --brand-green: #0f5a1c;
   --pipe: #8a4b33; --pipe-hi: #a8634a; --hole: #2a1d17;
-  --ok: #2f7d4f; --warn: #b7791f; --bad: #c0392b; --warn-soft: #fbf0d9; --bad-soft: #f8e1de;
-  --band: rgba(47,125,79,.14); --shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 14px rgba(0,0,0,.05);
+  --ok: #1b6b27; --warn: #b7791f; --bad: #c0392b; --warn-soft: #fbf0d9; --bad-soft: #f8e1de;
+  --band: rgba(27,107,39,.14); --shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 14px rgba(0,0,0,.05);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #111613; --surface: #1a211c; --surface-2: #222b25; --text: #e6ece6; --muted: #9aaa9e;
-    --line: #2f3a32; --accent: #5cbf83; --accent-ink: #0d1a12; --accent-soft: #1f3a2a;
+    --line: #2f3a32; --accent: #5cbf6a; --accent-ink: #0d1a10; --accent-soft: #1f3a22;
+    --brand-orange: #ff8a3d; --brand-green: #7fd38a;
     --pipe: #7a4430; --pipe-hi: #95573f; --hole: #0b0806;
-    --ok: #5cbf83; --warn: #e0a84a; --bad: #e57368; --warn-soft: #3a2e17; --bad-soft: #3d2220;
+    --ok: #5cbf6a; --warn: #e0a84a; --bad: #e57368; --warn-soft: #3a2e17; --bad-soft: #3d2220;
     --band: rgba(92,191,131,.16); --shadow: none;
   }
 }
 :root[data-theme="dark"] {
   --bg: #111613; --surface: #1a211c; --surface-2: #222b25; --text: #e6ece6; --muted: #9aaa9e;
-  --line: #2f3a32; --accent: #5cbf83; --accent-ink: #0d1a12; --accent-soft: #1f3a2a;
+  --line: #2f3a32; --accent: #5cbf6a; --accent-ink: #0d1a10; --accent-soft: #1f3a22;
+    --brand-orange: #ff8a3d; --brand-green: #7fd38a;
   --pipe: #7a4430; --pipe-hi: #95573f; --hole: #0b0806;
-  --ok: #5cbf83; --warn: #e0a84a; --bad: #e57368; --warn-soft: #3a2e17; --bad-soft: #3d2220;
+  --ok: #5cbf6a; --warn: #e0a84a; --bad: #e57368; --warn-soft: #3a2e17; --bad-soft: #3d2220;
   --band: rgba(92,191,131,.16); --shadow: none;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--text); }
 body { font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
-header { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: calc(10px + env(safe-area-inset-top)) 16px 10px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); }
-header h1 { font-size: 20px; margin: 0; flex: 1; }
+header { position: sticky; top: 0; z-index: 5; background: var(--bg); border-top: 4px solid var(--brand-orange); padding: calc(10px + env(safe-area-inset-top)) 16px 10px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); }
+header h1 { font: 800 24px/1.1 'Baloo 2', system-ui, sans-serif; margin: 0; flex: 1; letter-spacing: -.2px; }
+.b-green { color: var(--brand-green); }
+.b-orange { color: var(--brand-orange); }
+.banner { display: block; width: 100%; height: auto; border-radius: 16px; margin-bottom: 14px; box-shadow: var(--shadow); background: var(--surface-2); aspect-ratio: 2172 / 724; }
+.card h2 { font-family: 'Baloo 2', system-ui, sans-serif; font-weight: 700; font-size: 19px; }
 .mode { font-size: 12px; color: var(--muted); }
 main { padding: 16px 16px calc(96px + env(safe-area-inset-bottom)); max-width: 720px; margin: 0 auto; }
 nav.tabs { position: fixed; bottom: 0; left: 0; right: 0; z-index: 6; display: grid; grid-template-columns: repeat(4, 1fr); background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
@@ -115,7 +125,7 @@ textarea { min-height: 70px; resize: vertical; }
 </head>
 <body>
 <header>
-  <h1 id="title">🌱 Minha Horta</h1>
+  <h1 id="title"><span class="b-green">Horta do</span> <span class="b-orange">Joaquim</span></h1>
   <span class="mode" id="mode"></span>
   <button class="btn" id="btn-settings" aria-label="Ajustes" style="min-height:40px;padding:6px 10px">⚙️</button>
 </header>
