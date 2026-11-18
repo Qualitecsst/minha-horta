@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Minha Horta</title>
+<meta name="description" content="Acompanhamento da horta hidropônica: plantas, fotos, pH e lembretes.">
+<meta name="theme-color" content="#2f7d4f">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Minha Horta">
+<style>
+:root {
+  --bg: #f4f6f1; --surface: #ffffff; --surface-2: #eef2ea; --text: #1d2a21; --muted: #5f6f63;
+  --line: #d9e0d4; --accent: #2f7d4f; --accent-ink: #ffffff; --accent-soft: #dcefe2;
+  --pipe: #8a4b33; --pipe-hi: #a8634a; --hole: #2a1d17;
+  --ok: #2f7d4f; --warn: #b7791f; --bad: #c0392b; --warn-soft: #fbf0d9; --bad-soft: #f8e1de;
+  --band: rgba(47,125,79,.14); --shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 14px rgba(0,0,0,.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111613; --surface: #1a211c; --surface-2: #222b25; --text: #e6ece6; --muted: #9aaa9e;
+    --line: #2f3a32; --accent: #5cbf83; --accent-ink: #0d1a12; --accent-soft: #1f3a2a;
+    --pipe: #7a4430; --pipe-hi: #95573f; --hole: #0b0806;
+    --ok: #5cbf83; --warn: #e0a84a; --bad: #e57368; --warn-soft: #3a2e17; --bad-soft: #3d2220;
+    --band: rgba(92,191,131,.16); --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111613; --surface: #1a211c; --surface-2: #222b25; --text: #e6ece6; --muted: #9aaa9e;
+  --line: #2f3a32; --accent: #5cbf83; --accent-ink: #0d1a12; --accent-soft: #1f3a2a;
+  --pipe: #7a4430; --pipe-hi: #95573f; --hole: #0b0806;
+  --ok: #5cbf83; --warn: #e0a84a; --bad: #e57368; --warn-soft: #3a2e17; --bad-soft: #3d2220;
+  --band: rgba(92,191,131,.16); --shadow: none;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); }
+body { font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+header { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: calc(10px + env(safe-area-inset-top)) 16px 10px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); }
+header h1 { font-size: 20px; margin: 0; flex: 1; }
+.mode { font-size: 12px; color: var(--muted); }
+main { padding: 16px 16px calc(96px + env(safe-area-inset-bottom)); max-width: 720px; margin: 0 auto; }
+nav.tabs { position: fixed; bottom: 0; left: 0; right: 0; z-index: 6; display: grid; grid-template-columns: repeat(4, 1fr); background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
+nav.tabs button { background: none; border: 0; color: var(--muted); padding: 8px 0 10px; font: inherit; font-size: 12px; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; }
+nav.tabs button span { font-size: 22px; line-height: 1; }
+nav.tabs button[aria-current="page"] { color: var(--accent); font-weight: 600; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 14px; box-shadow: var(--shadow); }
+.card h2 { font-size: 16px; margin: 0 0 10px; }
+.row { display: flex; gap: 10px; align-items: center; }
+.row.wrap { flex-wrap: wrap; }
+.grow { flex: 1; min-width: 0; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.big { font-size: 34px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--surface-2); color: var(--muted); }
+.pill.ok { background: var(--accent-soft); color: var(--ok); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); }
+.btn { appearance: none; border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 10px; padding: 10px 14px; font: inherit; font-weight: 600; cursor: pointer; min-height: 44px; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.danger { color: var(--bad); }
+.btn.block { width: 100%; }
+.btn:disabled { opacity: .5; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+form .grid2 > div { display: flex; flex-direction: column; justify-content: flex-end; }
+label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+input, select, textarea { width: 100%; font: inherit; color: var(--text); background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-height: 44px; }
+textarea { min-height: 70px; resize: vertical; }
+.reminder { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--line); }
+.reminder:first-child { border-top: 0; padding-top: 0; }
+.reminder .ico { font-size: 22px; line-height: 1.2; }
+/* Horta */
+.garden { padding: 6px 0; }
+.tube { position: relative; margin: 18px 0 26px; }
+.tube-label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.pipe { position: relative; height: 34px; border-radius: 17px; background: linear-gradient(var(--pipe-hi), var(--pipe) 60%); display: flex; justify-content: space-around; align-items: center; padding: 0 8px; }
+.hole { width: 44px; height: 44px; border-radius: 50%; border: 3px solid var(--hole); background: var(--surface); display: grid; place-items: center; font-size: 22px; cursor: pointer; position: relative; padding: 0; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+.hole.empty { background: var(--hole); color: #6f5b51; font-size: 12px; font-weight: 700; }
+.hole .n { position: absolute; bottom: -18px; font-size: 11px; color: var(--muted); font-weight: 600; }
+.hole .ready { position: absolute; top: -6px; right: -6px; width: 14px; height: 14px; border-radius: 50%; background: var(--warn); border: 2px solid var(--surface); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); }
+/* Fotos */
+.photos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.photos figure { margin: 0; position: relative; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: var(--surface-2); cursor: pointer; }
+.photos img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photos figcaption { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 6px 4px; font-size: 11px; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,.65)); }
+.timeline { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x mandatory; }
+.timeline figure { margin: 0; flex: 0 0 132px; scroll-snap-align: start; }
+.timeline img { width: 132px; height: 132px; object-fit: cover; border-radius: 10px; display: block; background: var(--surface-2); cursor: pointer; }
+.timeline figcaption { font-size: 12px; color: var(--muted); margin-top: 4px; }
+/* Lista */
+.list > div { padding: 10px 0; border-top: 1px solid var(--line); display: flex; gap: 10px; align-items: center; }
+.list > div:first-child { border-top: 0; }
+/* Folha (sheet) */
+.scrim { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 20; display: flex; align-items: flex-end; justify-content: center; }
+.sheet { background: var(--surface); width: 100%; max-width: 720px; max-height: 92vh; overflow: auto; border-radius: 18px 18px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom)); }
+.sheet h3 { margin: 0 0 6px; font-size: 18px; }
+.sheet .actions { display: flex; gap: 10px; margin-top: 16px; }
+.sheet .actions .btn { flex: 1; }
+.viewer { position: fixed; inset: 0; z-index: 30; background: #000; display: flex; flex-direction: column; }
+.viewer img { flex: 1; min-height: 0; object-fit: contain; width: 100%; }
+.viewer .bar { display: flex; gap: 10px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); color: #fff; align-items: center; }
+.progress { height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; margin: 6px 0; }
+.progress > i { display: block; height: 100%; background: var(--accent); }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(84px + env(safe-area-inset-bottom)); background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px; z-index: 40; font-size: 14px; max-width: calc(100% - 32px); }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart .axis { stroke: var(--line); }
+.chart text { fill: var(--muted); font-size: 11px; }
+.empty-state { text-align: center; padding: 24px 8px; color: var(--muted); }
+.login { max-width: 400px; margin: 40px auto; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">🌱 Minha Horta</h1>
+  <span class="mode" id="mode"></span>
+  <button class="btn" id="btn-settings" aria-label="Ajustes" style="min-height:40px;padding:6px 10px">⚙️</button>
+</header>
+<main id="main"><div class="empty-state">Carregando…</div></main>
+<nav class="tabs" id="tabs">
+  <button data-tab="hoje"><span>🏠</span>Hoje</button>
+  <button data-tab="horta"><span>🪴</span>Horta</button>
+  <button data-tab="agua"><span>💧</span>Água</button>
+  <button data-tab="fotos"><span>📷</span>Fotos</button>
+</nav>
+<script type="module" src="app.js"></script>
+<script>
+if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+</script>
+</body>
+</html>
