@@ -1,7 +1,7 @@
 // Camada de dados: Supabase (nuvem) quando configurado, senão IndexedDB (só no aparelho).
 import { CONFIG } from './config.js';
 
-const TABLES = ['species', 'plantings', 'photos', 'readings', 'events', 'settings'];
+const TABLES = ['species', 'plantings', 'photos', 'readings', 'events', 'settings', 'harvests'];
 const T = t => (CONFIG.tablePrefix || '') + t;
 const BUCKET = () => CONFIG.bucket || 'fotos';
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(16).slice(2));
@@ -9,7 +9,7 @@ const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id-' + Date.now() 
 // ---------- Local (IndexedDB) ----------
 function openIdb() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open('horta', 1);
+    const req = indexedDB.open('horta', 2);
     req.onupgradeneeded = () => {
       const db = req.result;
       for (const t of TABLES) if (!db.objectStoreNames.contains(t)) db.createObjectStore(t, { keyPath: 'id' });
@@ -102,6 +102,14 @@ class CloudStore {
     return u;
   }
   async removePhoto(path) { await this.sb.storage.from(BUCKET()).remove([path]); }
+  async savePush(sub, device) {
+    this._chk(await this.sb.from(T('push_subs')).upsert({ user_id: this.session.user.id, endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth, device }, { onConflict: 'endpoint' }));
+  }
+  async testPush() {
+    const { data, error } = await this.sb.functions.invoke('horta-lembretes', { body: { test: true } });
+    if (error) throw error;
+    return data;
+  }
 }
 
 export function makeStore() {
