@@ -28,6 +28,25 @@ Use os dados da horta enviados junto (pH, EC, idade da planta) para pesar as hip
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+
+  // Autoteste (só com o segredo do agendador): confere se a chave do Claude funciona, sem foto.
+  const cron = req.headers.get("x-cron-secret");
+  if (cron) {
+    const { data: cfg } = await db.from("horta_push_config").select("cron_secret").single();
+    if (!cfg || cron !== cfg.cron_secret) return json({ error: "não autorizado" }, 401);
+    const key = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!key) return json({ ok: false, reason: "sem_chave" });
+    try {
+      const r = await new Anthropic({ apiKey: key }).messages.create({ model: MODEL, max_tokens: 300, output_config: { effort: "low" }, messages: [{ role: "user", content: "Responda só: ok" }] });
+      return json({ ok: true, model: r.model, stop: r.stop_reason });
+    } catch (e) {
+      if (e instanceof Anthropic.AuthenticationError) return json({ ok: false, reason: "chave_invalida" });
+      if (e instanceof Anthropic.PermissionDeniedError) return json({ ok: false, reason: "sem_permissao" });
+      if (e instanceof Anthropic.APIError) return json({ ok: false, reason: `api_${e.status}`, msg: e.message?.slice(0, 200) });
+      return json({ ok: false, reason: "rede" });
+    }
+  }
+
   const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   const { data: u } = await db.auth.getUser(token);
   if (!u?.user) return json({ error: "Faça login para usar o diagnóstico." }, 401);
