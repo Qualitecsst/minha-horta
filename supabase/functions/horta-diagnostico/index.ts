@@ -14,6 +14,11 @@ const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { sta
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
 const MODEL = "claude-opus-5-5";
 const LIMITE_DIA = 30;
+// Aceita o segredo mesmo se colaram um comando inteiro: pega só a chave sk-ant-...
+const claudeKey = () => {
+  const raw = (Deno.env.get("ANTHROPIC_API_KEY") || "").trim();
+  return raw.match(/sk-ant-[A-Za-z0-9_-]+/)?.[0] || raw;
+};
 
 const SYSTEM = `Você ajuda o Douglas a cuidar de uma horta hidropônica caseira (sistema NFT, tubos de PVC, solução nutritiva em caixa).
 Ele manda a foto de uma planta e às vezes uma pergunta. Responda em português do Brasil, de forma simples e direta, para um hobista.
@@ -34,16 +39,17 @@ Deno.serve(async (req) => {
   if (cron) {
     const { data: cfg } = await db.from("horta_push_config").select("cron_secret").single();
     if (!cfg || cron !== cfg.cron_secret) return json({ error: "não autorizado" }, 401);
-    const key = Deno.env.get("ANTHROPIC_API_KEY");
+    const key = claudeKey();
     if (!key) return json({ ok: false, reason: "sem_chave" });
+    const formato = key.startsWith("sk-ant-api") ? "api" : key.startsWith("sk-ant-") ? key.slice(0, 10) : "outro";
     try {
       const r = await new Anthropic({ apiKey: key }).messages.create({ model: MODEL, max_tokens: 300, output_config: { effort: "low" }, messages: [{ role: "user", content: "Responda só: ok" }] });
-      return json({ ok: true, model: r.model, stop: r.stop_reason });
+      return json({ ok: true, formato, model: r.model, stop: r.stop_reason });
     } catch (e) {
-      if (e instanceof Anthropic.AuthenticationError) return json({ ok: false, reason: "chave_invalida" });
+      if (e instanceof Anthropic.AuthenticationError) return json({ ok: false, formato, reason: "chave_invalida" });
       if (e instanceof Anthropic.PermissionDeniedError) return json({ ok: false, reason: "sem_permissao" });
       if (e instanceof Anthropic.APIError) return json({ ok: false, reason: `api_${e.status}`, msg: e.message?.slice(0, 200) });
-      return json({ ok: false, reason: "rede" });
+      return json({ ok: false, reason: "rede", name: (e as any)?.constructor?.name });
     }
   }
 
@@ -52,7 +58,7 @@ Deno.serve(async (req) => {
   if (!u?.user) return json({ error: "Faça login para usar o diagnóstico." }, 401);
   const uid = u.user.id;
 
-  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+  const apiKey = claudeKey();
   if (!apiKey) return json({ error: "O diagnóstico ainda não foi ligado (falta a chave do Claude)." }, 503);
 
   const body = await req.json().catch(() => null);
