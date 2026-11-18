@@ -20,7 +20,7 @@ const DEFAULT_SPECIES = [
   { name: 'Salsinha', emoji: '🌿', ph_min: 5.5, ph_max: 6.5, ec_min: 0.8, ec_max: 1.8, days_to_harvest: 60, continuous: true },
   { name: 'Cebolinha', emoji: '🧅', ph_min: 6.0, ph_max: 6.7, ec_min: 1.4, ec_max: 1.8, days_to_harvest: 60, continuous: true },
 ];
-const DEFAULT_SETTINGS = { layout: [4, 5, 5, 6], ph_every_days: 2, change_every_days: 14, reservoir_liters: 50, ph_down_ml_per_l: 0.3, ph_up_ml_per_l: 0.3, notify_enabled: true, notify_hour: 8 };
+const DEFAULT_SETTINGS = { layout: [4, 5, 5, 6], ph_every_days: 2, change_every_days: 14, reservoir_liters: 50, ph_down_ml_per_l: 0.3, ph_up_ml_per_l: 0.3, notify_enabled: true, notify_hour: 8, heat_alert_c: 30 };
 const UNITS = { g: 'g', un: 'unid.', maco: 'maço(s)', pe: 'pé(s)' };
 const EVENT_KINDS = {
   troca: { label: 'Troca da solução', ico: '🔄' },
@@ -31,12 +31,13 @@ const EVENT_KINDS = {
   outro: { label: 'Outro', ico: '📝' },
 };
 
-const S = { tab: 'hoje', species: [], plantings: [], photos: [], readings: [], events: [], harvests: [], settings: null };
+const S = { tab: 'hoje', species: [], plantings: [], photos: [], readings: [], events: [], harvests: [], diagnoses: [], settings: null };
 
 // ---------- Dados ----------
 async function loadAll() {
   const [species, plantings, photos, readings, events, settings, harvests] = await Promise.all(
     ['species', 'plantings', 'photos', 'readings', 'events', 'settings', 'harvests'].map(t => store.list(t)));
+  S.diagnoses = store.mode === 'cloud' ? (await store.list('diagnoses').catch(() => [])).sort((a, b) => b.created_at.localeCompare(a.created_at)) : [];
   S.harvests = harvests.sort((a, b) => b.harvested_on.localeCompare(a.harvested_on) || (b.created_at || '').localeCompare(a.created_at || ''));
   S.species = species.sort((a, b) => a.name.localeCompare(b.name));
   S.plantings = plantings;
@@ -157,6 +158,7 @@ function render() {
   const m = $('#main');
   m.innerHTML = { hoje: viewHoje, horta: viewHorta, agua: viewAgua, fotos: viewFotos }[S.tab]();
   bind(m); imgTags(m);
+  if (S.tab === 'hoje') fillClima($('#clima', m));
 }
 
 function viewHoje() {
@@ -186,6 +188,7 @@ function viewHoje() {
     <div class="row"><div class="grow"><b>pH alvo: ${fmt1(t.min)} a ${fmt1(t.max)}</b>
       <div class="muted small">${t.empty ? 'Faixa geral. Fica mais precisa quando você cadastrar as plantas.' : t.conflict ? 'As plantas atuais pedem faixas diferentes; use o meio da faixa.' : 'Faixa que atende todas as plantas da horta agora.'}</div></div></div>
   </div>
+  <div id="clima"></div>
   <div class="row" style="margin-bottom:14px">
     <button class="btn primary grow" data-act="ph">⚗️ Registrar pH</button>
     <button class="btn grow" data-act="evento">🔄 Registrar cuidado</button>
@@ -268,7 +271,8 @@ function viewAgua() {
 
 function viewFotos() {
   return `
-  <div class="row" style="margin-bottom:14px"><button class="btn primary grow" data-act="foto">📷 Nova foto</button></div>
+  <div class="row" style="margin-bottom:14px"><button class="btn primary grow" data-act="foto">📷 Nova foto</button>${store.mode === 'cloud' ? '<button class="btn grow" data-act="diag">🔍 Diagnóstico</button>' : ''}</div>
+  ${S.diagnoses.length ? `<div class="card"><h2>🔍 Diagnósticos</h2><div class="list">${S.diagnoses.slice(0, 10).map(diagRow).join('')}</div></div>` : ''}
   ${S.photos.length ? `<div class="photos">${S.photos.map(f => { const p = S.plantings.find(x => x.id === f.planting_id); const sp = p && spById(p.species_id);
     return `<figure data-photo="${f.id}"><img data-path="${esc(f.path)}" alt="" loading="lazy"><figcaption>${fmtDate(f.taken_on)}${sp ? ' · ' + sp.emoji + ' T' + p.tube + 'F' + p.hole : ' · horta'}</figcaption></figure>`; }).join('')}</div>`
     : '<div class="card empty-state">Nenhuma foto ainda. Tire uma da horta toda ou de uma planta específica (pelo furo na aba Horta).</div>'}`;
@@ -276,10 +280,11 @@ function viewFotos() {
 
 // ---------- Ações ----------
 function bind(root) {
-  root.querySelectorAll('[data-act]').forEach(b => b.onclick = () => ({ ph: formReading, troca: () => formEvent('troca'), evento: () => formEvent(), foto: () => formPhoto(), calc: () => formCalc(), placar: () => showHarvests() }[b.dataset.act])());
+  root.querySelectorAll('[data-act]').forEach(b => b.onclick = () => ({ ph: formReading, troca: () => formEvent('troca'), evento: () => formEvent(), foto: () => formPhoto(), calc: () => formCalc(), placar: () => showHarvests(), diag: () => formDiag() }[b.dataset.act])());
   root.querySelectorAll('[data-hole]').forEach(b => b.onclick = () => { const [t, h] = b.dataset.hole.split(':').map(Number); const p = plantAt(t, h); p ? showPlant(p.id) : formPlant(t, h); });
   root.querySelectorAll('[data-plant]').forEach(b => b.onclick = () => showPlant(b.dataset.plant));
   root.querySelectorAll('[data-photo]').forEach(b => b.onclick = () => viewPhoto(b.dataset.photo));
+  root.querySelectorAll('[data-diag]').forEach(b => b.onclick = () => showDiag(S.diagnoses.find(x => x.id === b.dataset.diag)));
   root.querySelectorAll('[data-del-reading]').forEach(b => b.onclick = async () => { if (!confirm('Apagar esta medição?')) return; await store.remove('readings', b.dataset.delReading); S.readings = S.readings.filter(r => r.id !== b.dataset.delReading); render(); });
   root.querySelectorAll('[data-del-event]').forEach(b => b.onclick = async () => { if (!confirm('Apagar este registro?')) return; await store.remove('events', b.dataset.delEvent); S.events = S.events.filter(r => r.id !== b.dataset.delEvent); render(); });
 }
@@ -338,12 +343,16 @@ function showPlant(id) {
     ${p.notes ? `<p class="small">${esc(p.notes)}</p>` : ''}
     <h3 style="margin-top:16px;font-size:15px">Linha do tempo (${photos.length} foto${photos.length === 1 ? '' : 's'})</h3>
     ${photos.length ? `<div class="timeline">${photos.map(f => `<figure><img data-path="${esc(f.path)}" data-photo="${f.id}" alt=""><figcaption>${fmtDate(f.taken_on)} · dia ${Math.max(0, Math.round((parseDay(f.taken_on) - parseDay(p.planted_on)) / DAY))}</figcaption></figure>`).join('')}</div>` : '<div class="muted small">Nenhuma foto desta planta ainda.</div>'}
+    ${S.diagnoses.some(d => d.planting_id === id) ? `<h3 style="margin-top:16px;font-size:15px">Diagnósticos</h3><div class="list">${S.diagnoses.filter(d => d.planting_id === id).map(diagRow).join('')}</div>` : ''}
     <div class="actions"><button class="btn primary" data-a="foto">📷 Foto</button>${!p.harvested_on ? `<button class="btn" data-a="colher">🧺 Colher</button>` : ''}</div>
+    ${store.mode === 'cloud' ? '<button class="btn block" data-a="diag" style="margin-top:8px">🔍 Diagnóstico por foto</button>' : ''}
     <div class="actions" style="margin-top:8px"><button class="btn" data-a="editar">Editar</button><button class="btn danger" data-a="apagar">Apagar</button><button class="btn" data-close>Fechar</button></div>`,
     (el, close) => {
       imgTags(el);
       el.querySelectorAll('[data-photo]').forEach(i => i.onclick = () => viewPhoto(i.dataset.photo));
       $('[data-a=foto]', el).onclick = () => { close(); formPhoto(id); };
+      const dg = $('[data-a=diag]', el); if (dg) dg.onclick = () => { close(); formDiag(id); };
+      el.querySelectorAll('[data-diag]').forEach(b => b.onclick = () => showDiag(S.diagnoses.find(x => x.id === b.dataset.diag)));
       $('[data-a=editar]', el).onclick = () => { close(); formPlant(p.tube, p.hole, p); };
       $('[data-a=apagar]', el).onclick = async () => { if (!confirm('Apagar esta planta e o histórico dela? As fotos continuam na aba Fotos.')) return;
         await store.remove('plantings', id); S.plantings = S.plantings.filter(x => x.id !== id); close(); render(); };
@@ -504,6 +513,9 @@ function showSettings() {
     <div><label>Trocar solução a cada (dias)</label><input name="change_every_days" type="number" min="1" value="${S.settings.change_every_days}"></div></div>
     <div class="grid2"><div><label>Água na caixa (litros)</label><input name="reservoir_liters" type="number" step="any" min="1" value="${S.settings.reservoir_liters}"></div>
     <div><label>Notificação diária às</label><select name="notify_hour">${Array.from({ length: 17 }, (_, i) => i + 6).map(h => `<option value="${h}" ${h === +S.settings.notify_hour ? 'selected' : ''}>${h}h</option>`).join('')}</select></div></div>
+    <div class="grid2"><div><label>Cidade (previsão do tempo)</label><input name="city" value="${esc(S.settings.city || '')}" placeholder="ex.: Curitiba"></div>
+    <div><label>Alerta de calor a partir de (°C)</label><input name="heat_alert_c" type="number" step="1" value="${S.settings.heat_alert_c ?? 30}"></div></div>
+    <button type="button" class="btn block" data-a="geo" style="margin-top:8px">📍 Usar a localização do celular</button>
     <label style="display:flex;gap:8px;align-items:center;color:var(--text)"><input type="checkbox" name="notify_enabled" style="width:auto;min-height:0" ${S.settings.notify_enabled !== false ? 'checked' : ''}> Mandar os lembretes como notificação</label>
     <div class="actions"><button class="btn primary">Salvar ajustes</button></div></form>
     ${store.mode === 'cloud' ? `<h3 style="margin-top:20px;font-size:15px">🔔 Notificações neste celular</h3>
@@ -520,13 +532,27 @@ function showSettings() {
       f.onsubmit = e => { e.preventDefault(); const d = Object.fromEntries(new FormData(f));
         const layout = d.layout.split(/[,\s;]+/).map(Number).filter(n => n > 0 && n < 40);
         if (!layout.length) return toast('Informe os furos de cada tubo, ex.: 4, 5, 5, 6');
-        busy($('.primary', f), async () => { const patch = { layout, ph_every_days: +d.ph_every_days || 2, change_every_days: +d.change_every_days || 14, reservoir_liters: num(d.reservoir_liters) || 50, notify_hour: +d.notify_hour, notify_enabled: !!d.notify_enabled };
+        busy($('.primary', f), async () => { const patch = { layout, ph_every_days: +d.ph_every_days || 2, change_every_days: +d.change_every_days || 14, reservoir_liters: num(d.reservoir_liters) || 50, notify_hour: +d.notify_hour, notify_enabled: !!d.notify_enabled, heat_alert_c: num(d.heat_alert_c) ?? 30 };
+          const city = (d.city || '').trim();
+          if (city && city !== (S.settings.city || '')) {
+            const g = await geocode(city); if (!g) throw new Error('não achei essa cidade. Tente "Cidade, Estado".');
+            Object.assign(patch, g);
+          } else if (!city) Object.assign(patch, { city: null, lat: null, lon: null });
           await store.update('settings', S.settingsRow.id, patch); Object.assign(S.settings, patch); close(); render(); toast('Ajustes salvos'); }); };
       el.querySelectorAll('[data-sp]').forEach(r => r.onclick = () => { close(); formSpecies(spById(r.dataset.sp)); });
       $('[data-a=newsp]', el).onclick = () => { close(); formSpecies(); };
       $('[data-a=export]', el).onclick = () => { const blob = new Blob([JSON.stringify({ exportado_em: new Date().toISOString(), ...S }, null, 2)], { type: 'application/json' });
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `horta-${todayISO()}.json`; a.click(); };
       const o = $('[data-a=out]', el); if (o) o.onclick = async () => { await store.signOut(); location.reload(); };
+      $('[data-a=geo]', el).onclick = () => {
+        if (!navigator.geolocation) return toast('Este celular não informa a localização.');
+        navigator.geolocation.getCurrentPosition(async pos => {
+          const lat = +pos.coords.latitude.toFixed(3), lon = +pos.coords.longitude.toFixed(3);
+          const city = await reverseCity(lat, lon);
+          await store.update('settings', S.settingsRow.id, { lat, lon, city }); Object.assign(S.settings, { lat, lon, city });
+          f.city.value = city; clearClima(); toast('Localização salva: ' + city);
+        }, () => toast('Não consegui a localização. Digite a cidade.'), { timeout: 15000 });
+      };
       const st = $('#push-st', el);
       if (st) {
         const upd = async () => { st.textContent = await pushStatus(); };
@@ -603,3 +629,98 @@ try { S.tab = localStorage.getItem('tab') || 'hoje'; } catch {}
   if (store.mode === 'cloud' && !ok) return viewLogin();
   await start();
 })();
+
+
+// ---------- Previsão do tempo (Open-Meteo, grátis e sem chave) ----------
+async function geocode(name) {
+  const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name.split(',')[0])}&count=10&language=pt&countryCode=BR`).then(r => r.json()).catch(() => null);
+  const uf = (name.split(',')[1] || '').trim().toLowerCase();
+  const hit = (r?.results || []).find(x => !uf || (x.admin1 || '').toLowerCase().includes(uf)) || r?.results?.[0];
+  return hit ? { city: `${hit.name}${hit.admin1 ? ', ' + hit.admin1 : ''}`, lat: +hit.latitude.toFixed(3), lon: +hit.longitude.toFixed(3) } : null;
+}
+async function reverseCity() { return 'Minha localização'; }
+const WMO = c => c === 0 ? '☀️' : c <= 2 ? '🌤️' : c === 3 ? '☁️' : c <= 48 ? '🌫️' : c <= 67 ? '🌧️' : c <= 77 ? '🌨️' : c <= 82 ? '🌦️' : '⛈️';
+function clearClima() { try { localStorage.removeItem('clima'); } catch {} }
+async function getClima() {
+  const { lat, lon } = S.settings; if (lat == null || lon == null) return null;
+  const key = `${lat},${lon}`;
+  try { const c = JSON.parse(localStorage.getItem('clima') || 'null'); if (c && c.key === key && Date.now() - c.t < 3600e3) return c.d; } catch {}
+  const d = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code&current=temperature_2m&timezone=America%2FSao_Paulo&forecast_days=4`).then(r => r.json());
+  try { localStorage.setItem('clima', JSON.stringify({ key, t: Date.now(), d })); } catch {}
+  return d;
+}
+const DOW = s => parseDay(s).toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
+async function fillClima(el) {
+  if (!el) return;
+  if (S.settings.lat == null) { el.innerHTML = `<div class="card small"><b>🌡️ Previsão do tempo</b><div class="muted">Coloque sua cidade nos ajustes (⚙️) para receber alerta de dias quentes.</div></div>`; return; }
+  let d; try { d = await getClima(); } catch { d = null; }
+  if (!d?.daily) { el.innerHTML = ''; return; }
+  const D = d.daily, lim = +S.settings.heat_alert_c || 30;
+  const hot = D.time.map((t, i) => ({ t, max: D.temperature_2m_max[i] })).filter(x => x.max >= lim);
+  const today = hot.find(x => x.t === D.time[0]);
+  const alerta = hot.length ? `<div class="reminder" style="padding-top:10px;border-top:1px solid var(--line);margin-top:10px"><div class="ico">🥵</div><div class="grow">
+      <b>${today ? `Hoje vai a ${Math.round(today.max)} °C` : `Calor ${DOW(hot[0].t)}: ${Math.round(hot[0].max)} °C`}</b> <span class="pill ${today ? 'bad' : 'warn'}">${today ? 'atenção' : 'em breve'}</span>
+      <div class="muted small">Água quente segura menos oxigênio e as raízes sofrem. Faça sombra na caixa e nos tubos, complete a água (evapora mais) e confira se a bomba está rodando. Se puder, meça a temperatura da água: o ideal é abaixo de 26 °C.</div></div></div>` : '';
+  el.innerHTML = `<div class="card"><div class="row"><b class="grow">${WMO(D.weather_code[0])} ${esc(S.settings.city || 'Previsão')}</b><span class="muted small">agora ${Math.round(d.current?.temperature_2m ?? D.temperature_2m_max[0])} °C</span></div>
+    <div class="grid2" style="grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px;text-align:center">${D.time.map((t, i) => `<div style="padding:6px 0;border-radius:10px;background:${D.temperature_2m_max[i] >= lim ? 'var(--warn-soft)' : 'var(--surface-2)'}">
+      <div class="small muted">${i ? DOW(t) : 'hoje'}</div><div style="font-size:20px">${WMO(D.weather_code[i])}</div><div class="small"><b>${Math.round(D.temperature_2m_max[i])}°</b> <span class="muted">${Math.round(D.temperature_2m_min[i])}°</span></div>
+      <div class="small muted">💧${D.precipitation_probability_max[i] ?? 0}%</div></div>`).join('')}</div>${alerta}</div>`;
+}
+
+
+// ---------- Diagnóstico por foto (Claude) ----------
+function mdLite(t) {
+  return esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').split('\n').map(l => /^\s*[-•]\s+/.test(l) ? `<div style="padding-left:14px;text-indent:-10px">• ${l.replace(/^\s*[-•]\s+/, '')}</div>` : l.trim() ? `<div style="margin-top:8px">${l}</div>` : '').join('');
+}
+function diagRow(d) {
+  const p = S.plantings.find(x => x.id === d.planting_id); const sp = p && spById(p.species_id);
+  const first = (d.result || '').replace(/\*\*[^*]+\*\*/, '').split('\n').find(l => l.trim()) || '';
+  return `<div data-diag="${d.id}" style="cursor:pointer">${d.photo_path ? `<img data-path="${esc(d.photo_path)}" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:8px;background:var(--surface-2)">` : '<span style="font-size:24px">🔍</span>'}
+    <div class="grow"><b>${sp ? sp.emoji + ' ' + esc(sp.name) : 'Planta'}</b> <span class="muted small">${fmtDate(d.created_at)}</span><div class="muted small" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(first.trim())}</div></div><span class="muted">›</span></div>`;
+}
+function showDiag(d) {
+  if (!d) return;
+  const p = S.plantings.find(x => x.id === d.planting_id); const sp = p && spById(p.species_id);
+  sheet(`<h3>🔍 ${sp ? sp.emoji + ' ' + esc(sp.name) : 'Diagnóstico'}</h3><div class="muted small">${fmtDateTime(d.created_at)}${p ? ` · T${p.tube}F${p.hole}` : ''}</div>
+    ${d.photo_path ? `<img data-path="${esc(d.photo_path)}" alt="" style="width:100%;max-height:260px;object-fit:cover;border-radius:12px;margin-top:10px;background:var(--surface-2)">` : ''}
+    ${d.question ? `<div class="small" style="margin-top:10px"><b>Sua pergunta:</b> ${esc(d.question)}</div>` : ''}
+    <div class="card small" style="margin:12px 0 0;background:var(--surface-2);line-height:1.5">${mdLite(d.result || '')}</div>
+    <div class="muted small" style="margin-top:8px">Sugestão da IA, não é certeza. Confira o pH, a EC e a água antes de mudar algo grande.</div>
+    <div class="actions"><button class="btn danger" data-a="del">Apagar</button><button class="btn" data-close>Fechar</button></div>`,
+    (el, close) => { imgTags(el); $('[data-a=del]', el).onclick = async () => { if (!confirm('Apagar este diagnóstico?')) return;
+      await store.remove('diagnoses', d.id); S.diagnoses = S.diagnoses.filter(x => x.id !== d.id); close(); render(); }; });
+}
+const blobToB64 = b => new Promise(res => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.readAsDataURL(b); });
+function formDiag(plantingId) {
+  sheet(`<h3>🔍 Diagnóstico por foto</h3><div class="muted small">Tire uma foto de perto, com luz natural, mostrando a folha ou a parte com problema.</div><form>
+    <label>Foto</label><input name="file" type="file" accept="image/*" capture="environment" required>
+    <img id="prev" alt="" style="display:none;width:100%;max-height:220px;object-fit:contain;margin-top:8px;border-radius:10px;background:var(--surface-2)">
+    <label>Qual planta</label><select name="planting_id"><option value="">Não sei / outra</option>${active().sort((a, b) => a.tube - b.tube || a.hole - b.hole).map(p => { const sp = spById(p.species_id); return `<option value="${p.id}" ${p.id === plantingId ? 'selected' : ''}>${sp?.emoji} ${esc(sp?.name)} · T${p.tube} F${p.hole}</option>`; }).join('')}</select>
+    <label>O que você está vendo? (opcional)</label><textarea name="question" placeholder="ex.: folhas novas amarelando, pontinhos brancos embaixo da folha"></textarea>
+    <label style="display:flex;gap:8px;align-items:center;color:var(--text)"><input type="checkbox" name="save" style="width:auto;min-height:0" checked> Guardar a foto no diário da planta</label>
+    <div class="actions"><button type="button" class="btn" data-close>Cancelar</button><button class="btn primary">Analisar</button></div></form>`,
+    (el, close) => { const f = $('form', el);
+      f.file.onchange = () => { const file = f.file.files[0]; if (file) { const i = $('#prev', el); i.src = URL.createObjectURL(file); i.style.display = 'block'; } };
+      f.onsubmit = e => { e.preventDefault(); const file = f.file.files[0]; if (!file) return;
+        const btn = $('.primary', f);
+        busy(btn, async () => {
+          btn.textContent = 'Analisando… (até 1 min)';
+          const blob = await compress(file);
+          const pid = f.planting_id.value || null; const p = S.plantings.find(x => x.id === pid); const sp = p && spById(p.species_id);
+          let path = null;
+          if (f.save.checked) {
+            path = await store.uploadPhoto(blob);
+            const ph = await store.insert('photos', { planting_id: pid, taken_on: todayISO(), note: 'Diagnóstico' + (f.question.value ? ': ' + f.question.value.slice(0, 80) : ''), path });
+            S.photos.unshift(ph);
+          }
+          const lastR = S.readings.filter(r => r.ph != null).at(-1); const lastEc = S.readings.filter(r => r.ec != null).at(-1);
+          const lastT = S.readings.filter(r => r.water_temp != null).at(-1); const troca = S.events.find(e => e.kind === 'troca');
+          const t = targetPh(); let air = null; try { air = (await getClima())?.daily?.temperature_2m_max?.[0] ?? null; } catch {}
+          const context = { species: sp?.name, age_days: p ? daysSince(p.planted_on) : null, ph: lastR ? +lastR.ph : null, ph_when: lastR ? fmtDateTime(lastR.measured_at) : null,
+            ph_target: `${fmt1(t.min)} a ${fmt1(t.max)}`, ec: lastEc ? +lastEc.ec : null, water_temp: lastT ? +lastT.water_temp : null,
+            days_since_change: troca ? daysSince(troca.happened_on) : null, air_max: air };
+          const r = await store.diagnose({ image: await blobToB64(blob), planting_id: pid, photo_path: path, question: f.question.value || '', context });
+          S.diagnoses.unshift(r.diagnosis || { id: 'tmp', result: r.result, created_at: new Date().toISOString(), planting_id: pid, photo_path: path, question: f.question.value });
+          close(); render(); showDiag(S.diagnoses[0]);
+        }); }; });
+}

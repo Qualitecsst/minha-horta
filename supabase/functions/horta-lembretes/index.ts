@@ -58,6 +58,13 @@ async function remindersFor(uid: string, s: Record<string, any>) {
     if (age >= x.days_to_harvest && (!x.continuous || lastCut == null || lastCut >= 14)) ready.set(x.name, (ready.get(x.name) || 0) + 1);
   }
   if (ready.size) items.push("🧺 Pronto para colher: " + [...ready].map(([n, c]) => `${n}${c > 1 ? ` (${c})` : ""}`).join(", ") + ".");
+  if (s.lat != null && s.lon != null) {
+    try {
+      const w = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${s.lat}&longitude=${s.lon}&daily=temperature_2m_max&timezone=America%2FSao_Paulo&forecast_days=1`).then((r) => r.json());
+      const max = w?.daily?.temperature_2m_max?.[0];
+      if (max != null && max >= (s.heat_alert_c ?? 30)) items.unshift(`🥵 Hoje vai a ${Math.round(max)} °C: faça sombra na caixa, complete a água e confira a bomba.`);
+    } catch (e) { console.error("clima falhou", e); }
+  }
   return items;
 }
 

@@ -105,6 +105,15 @@ class CloudStore {
   async savePush(sub, device) {
     this._chk(await this.sb.from(T('push_subs')).upsert({ user_id: this.session.user.id, endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth, device }, { onConflict: 'endpoint' }));
   }
+  async diagnose(payload) {
+    const { data, error } = await this.sb.functions.invoke('horta-diagnostico', { body: payload });
+    if (error) {
+      let msg = error.message;
+      try { const j = await error.context.json(); if (j?.error) msg = j.error; } catch {}
+      throw new Error(msg);
+    }
+    return data;
+  }
   async testPush() {
     const { data, error } = await this.sb.functions.invoke('horta-lembretes', { body: { test: true } });
     if (error) throw error;
